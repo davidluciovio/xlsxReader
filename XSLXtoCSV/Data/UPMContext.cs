@@ -16,6 +16,8 @@ public partial class UPMContext : DbContext
     {
     }
 
+    public virtual DbSet<OperationalEfficiency> OperationalEfficiencies { get; set; }
+
     public virtual DbSet<ProductionAchievement> ProductionAchievements { get; set; }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
@@ -25,6 +27,18 @@ public partial class UPMContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.UseCollation("Modern_Spanish_CI_AS");
+
+        modelBuilder.Entity<OperationalEfficiency>(entity =>
+        {
+            entity.ToTable("OperationalEfficiency", "upm_temporal");
+
+            entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
+            entity.Property(e => e.Hp).HasColumnName("HP");
+            entity.Property(e => e.Leader).HasMaxLength(100);
+            entity.Property(e => e.PartNumberName).HasMaxLength(200);
+            entity.Property(e => e.Shift).HasMaxLength(50);
+            entity.Property(e => e.Supervisor).HasMaxLength(100);
+        });
 
         modelBuilder.Entity<ProductionAchievement>(entity =>
         {
