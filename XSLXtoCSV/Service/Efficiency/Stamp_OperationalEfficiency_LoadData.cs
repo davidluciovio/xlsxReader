@@ -11,98 +11,109 @@ using XSLXtoCSV.Data.UPM_System;
 
 namespace XSLXtoCSV.Service.Efficiency
 {
-    public class Assy01_OperationalEfficiency_LoadData
+    public class Stamp_OperationalEfficiency_LoadData
     {
-        public static void NormalizeEfficiency(string inputFile, string outputFile, string area = "ENSAMBLE I", string shift = "1")
+        public static void NormalizeEstampado(string inputFile, string outputFile)
         {
             var lines = File.ReadAllLines(inputFile, Encoding.UTF8);
-
-            if (lines.Length < 4)
-            {
-                throw new InvalidDataException("El archivo de eficiencia es demasiado corto.");
-            }
-
             var csvSplitRegex = new Regex(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
-
-            // Las fechas están en la fila 2 (índice 2) a partir de la columna 7
-            var dateHeaderLine = lines[2];
-            var dateHeaders = csvSplitRegex.Split(dateHeaderLine).Select(s => s.Trim(' ', '"')).ToArray();
 
             var normalizedData = new List<OperationalEfficiency>();
 
-            // Los datos empiezan en la fila 3 (índice 3) y se procesan en bloques de 13 filas
-            for (int i = 3; i + 12 < lines.Length; i += 13)
+            // Variables de contexto que se irán actualizando al encontrar nuevos encabezados
+            string[] currentSupervisors = null;
+            string[] currentLeaders = null;
+            string[] currentDates = null;
+
+            for (int i = 0; i < lines.Length; i++)
             {
-                // Extraemos las 13 filas del bloque actual
-                var groupLines = lines.Skip(i).Take(13).Select(l =>
-                    csvSplitRegex.Split(l).Select(s => s.Trim(' ', '"')).ToArray()
-                ).ToList();
+                var columns = csvSplitRegex.Split(lines[i]).Select(s => s.Trim(' ', '"')).ToArray();
+                if (columns.Length < 5) continue;
 
-                // Metadatos básicos (están en la primera fila del bloque)
-                var supervisor = groupLines[0][1];
-                var leader = groupLines[0][2];
-                var partNumber = groupLines[0][3];
+                string indicator = columns[3]; // La columna 3 nos dice qué tipo de fila es
 
-                // HP y Neck (están en la fila 2 y 3 del bloque, columna 4)
-                float.TryParse(groupLines[1][4], NumberStyles.Any, CultureInfo.InvariantCulture, out float hp);
-                float.TryParse(groupLines[2][4], NumberStyles.Any, CultureInfo.InvariantCulture, out float neck);
-
-                if (string.IsNullOrWhiteSpace(partNumber)) continue;
-
-                // Iterar por los días (Columnas 7 a 37 del CSV)
-                for (int colIndex = 7; colIndex < dateHeaders.Length; colIndex++)
+                // 1. Detectar y actualizar encabezados
+                if (indicator.Equals("SUPERVISOR", StringComparison.OrdinalIgnoreCase))
                 {
-                    var dateStr = dateHeaders[colIndex];
-                    if (string.IsNullOrWhiteSpace(dateStr)) continue;
+                    currentSupervisors = columns;
+                    continue;
+                }
+                if (indicator.Equals("LIDER", StringComparison.OrdinalIgnoreCase))
+                {
+                    currentLeaders = columns;
+                    continue;
+                }
+                // Detectar fila de fechas (usualmente empieza vacío en col 3 y tiene fechas en col 4)
+                if (string.IsNullOrEmpty(indicator) && columns.Length > 4 && columns[4].Contains("/12/2025"))
+                {
+                    currentDates = columns;
+                    continue;
+                }
 
-                    // Extraer valores de cada una de las 13 filas para el día actual
-                    // Usamos un pequeño helper local para parsear floats
-                    float GetVal(int rowIdx) => float.TryParse(groupLines[rowIdx][colIndex], NumberStyles.Any, CultureInfo.InvariantCulture, out float v) ? v : 0;
+                // 2. Si encontramos "STROKE", comienza un bloque de datos de 9 filas
+                if (indicator.Equals("STROKE", StringComparison.OrdinalIgnoreCase) && i + 8 < lines.Length)
+                {
+                    // Extraer las 9 filas del bloque
+                    var groupLines = lines.Skip(i).Take(9).Select(l =>
+                        csvSplitRegex.Split(l).Select(s => s.Trim(' ', '"')).ToArray()
+                    ).ToList();
 
-                    float realTime = GetVal(0); // TIEMPO REAL
-                    float productionReal = GetVal(2); // PIEZAS
+                    var area = groupLines[0][0];       // PRENSA (Col 0)
+                    var shiftRaw = groupLines[0][1];   // TURNO (Col 1)
+                    var partNumber = groupLines[0][2]; // NÚMERO DE PARTE (Col 2)
 
-                    // Solo agregamos si hubo producción o tiempo reportado
-                    if (realTime > 0 || productionReal > 0)
+                    if (string.IsNullOrWhiteSpace(partNumber)) continue;
+
+                    string shift = (shiftRaw == "1°") ? "1" : "3";
+
+                    // Iterar por los días (Columnas 4 a 34)
+                    for (int colIndex = 4; colIndex < (currentDates?.Length ?? 0); colIndex++)
                     {
-                        var culture = CultureInfo.GetCultureInfo("es-MX");
-                        var cleanDateStr = dateStr.Replace("a. m.", "AM").Replace("p. m.", "PM").Trim();
+                        var dateStr = currentDates[colIndex];
+                        if (string.IsNullOrWhiteSpace(dateStr) || dateStr.Contains("APROV")) continue;
 
-                        if (DateTime.TryParse(cleanDateStr, culture, DateTimeStyles.None, out DateTime prodDate))
+                        // Helper para obtener valores numéricos de las 9 filas
+                        float GetVal(int rowIdx) => (colIndex < groupLines[rowIdx].Length && float.TryParse(groupLines[rowIdx][colIndex], NumberStyles.Any, CultureInfo.InvariantCulture, out float v)) ? v : 0;
+
+                        float spmReal = GetVal(5); // Fila 6: SPM REAL
+                        float spmSet = GetVal(6);  // Fila 7: SPM SET
+
+                        if (spmReal > 0 || spmSet > 0)
                         {
-                            normalizedData.Add(new OperationalEfficiency
-                            {
-                                Id = Guid.NewGuid(),
-                                Active = true,
-                                CreateDate = DateTime.UtcNow,
-                                CreateBy = "System_Normalize_Efficiency",
-                                ProductionDate = prodDate,
-                                Area = area,
-                                Supervisor = supervisor,
-                                Leader = leader,
-                                Shift = shift,
-                                PartNumberName = partNumber,
-                                Hp = hp,
-                                Neck = neck,
+                            var culture = CultureInfo.GetCultureInfo("es-MX");
+                            var cleanDateStr = dateStr.Replace("a. m.", "AM").Replace("p. m.", "PM").Trim();
 
-                                // Mapeo de indicadores según la estructura del archivo
-                                RealTime = realTime,
-                                OperativityPercent = GetVal(1),   // TAZA DE OPERATIVIDAD
-                                PriductionReal = productionReal,  // PIEZAS
-                                TotalTime = GetVal(3),            // TIEMPO TOTAL
-                                ProgramabeDowntimeTime = GetVal(4), // PARO PROGRAMADO
-                                RealWorkingTime = GetVal(5),      // TIEMPO REAL TRABAJADO
-                                NetoWorkingTime = GetVal(6),      // TIEMPO NETO PRODUCTIVO (Mapeado a ambos)
-                                NetoProduictiveTime = GetVal(6),  // TIEMPO NETO PRODUCTIVO
-                                TotalDowntime = GetVal(7),        // TIEMPO DE PARO TOTAL
-                                NoProgramabeDowntimeTime = GetVal(8), // PARO NO PROGRAMADO
-                                NoReportedTime = GetVal(9),       // TIEMPO NO REPORTADO
-                                DowntimePercent = GetVal(10),     // % DE PARO TOTAL
-                                NoProgramableDowntimePercent = GetVal(11), // % DE PARO NO PROGRAMADO
-                                ProgramableDowntimePercent = GetVal(12)    // % DE PARO NO REPORTADO
-                            });
+                            if (DateTime.TryParse(cleanDateStr, culture, DateTimeStyles.None, out DateTime prodDate))
+                            {
+                                normalizedData.Add(new OperationalEfficiency
+                                {
+                                    Id = Guid.NewGuid(),
+                                    Active = true,
+                                    CreateDate = DateTime.UtcNow,
+                                    CreateBy = "System_Normalize_Estampado_AllShifts",
+                                    ProductionDate = prodDate,
+                                    Area = "ESTAMPADO",
+                                    Supervisor = (currentSupervisors != null && colIndex < currentSupervisors.Length) ? currentSupervisors[colIndex] : "",
+                                    Leader = (currentLeaders != null && colIndex < currentLeaders.Length) ? currentLeaders[colIndex] : "",
+                                    Shift = shift,
+                                    PartNumberName = partNumber,
+
+                                    Hp = spmSet,
+                                    PriductionReal = spmReal,
+                                    TotalTime = spmSet,            // T.T.
+                                    RealWorkingTime = spmReal,      // T.T.T.
+                                    TotalDowntime = GetVal(2) + GetVal(3), // JUNTA + PILOTAJE
+                                    OperativityPercent = spmReal / spmSet,   // % APROV.
+
+                                    RealTime = GetVal(1),
+                                    NoProgramabeDowntimeTime = GetVal(0) // STROKE
+                                });
+                            }
                         }
                     }
+
+                    // Saltamos las 8 filas que ya procesamos en este bloque
+                    i += 8;
                 }
             }
 
@@ -156,7 +167,7 @@ namespace XSLXtoCSV.Service.Efficiency
 
                     var columns = csvSplitRegex.Split(line).Select(s => s.Trim(' ', '"')).ToArray();
 
-                    if (float.Parse(columns[14], CultureInfo.InvariantCulture) == 0) continue; // Saltar registros sin producción
+                    if (float.Parse(columns[14], CultureInfo.InvariantCulture) == 0) continue;
 
                     try
                     {
@@ -167,7 +178,7 @@ namespace XSLXtoCSV.Service.Efficiency
                             CreateDate = DateTime.UtcNow,
                             CreateBy = "System_Reload_EF9",
                             ProductionDate = DateTime.Parse(columns[4], CultureInfo.InvariantCulture, DateTimeStyles.None),
-                            Area = columns[5],
+                            Area = "ESTAMPADO",
                             Supervisor = columns[6],
                             Leader = columns[7],
                             Shift = columns[8],
@@ -206,41 +217,42 @@ namespace XSLXtoCSV.Service.Efficiency
             {
                 using (var context = new UPMContext())
                 {
-                    // Usamos una transacción para garantizar que no borremos datos si la inserción falla
+                    // Iniciamos una transacción para garantizar la atomicidad (borrado + inserción)
                     using var transaction = await context.Database.BeginTransactionAsync();
 
                     try
                     {
-                        // 1. Identificamos qué Áreas y Periodos (Mes/Año) vienen en el CSV
+                        // 1. Identificamos qué Áreas y Periodos (Año/Mes) vienen en el CSV
+                        // Esto nos permite limpiar exactamente lo que vamos a reponer
                         var targets = normalizedData
                             .GroupBy(x => new { x.Area, x.ProductionDate.Year, x.ProductionDate.Month })
                             .Select(g => g.Key);
 
                         foreach (var target in targets)
                         {
-                            // 2. EF9: Eliminación directa y ultra rápida en la DB
+                            // 2. EF9: Ejecutar Delete directo en la base de datos
                             await context.OperationalEfficiencies
                                 .Where(p => p.Area == target.Area
                                          && p.ProductionDate.Year == target.Year
                                          && p.ProductionDate.Month == target.Month)
                                 .ExecuteDeleteAsync();
 
-                            Console.WriteLine($"Limpieza exitosa: {target.Area} ({target.Month}/{target.Year})");
+                            Console.WriteLine($"Limpieza completada: Área {target.Area} - Periodo {target.Month}/{target.Year}");
                         }
 
-                        // 3. Inserción de los nuevos datos normalizados
+                        // 3. Inserción masiva de los nuevos datos
                         await context.OperationalEfficiencies.AddRangeAsync(normalizedData);
                         await context.SaveChangesAsync();
 
-                        // 4. Confirmar transacción
+                        // 4. Confirmamos la transacción
                         await transaction.CommitAsync();
-                        Console.WriteLine($"Carga finalizada exitosamente. Total insertados: {normalizedData.Count}");
+                        Console.WriteLine($"Carga finalizada con éxito. Registros insertados: {normalizedData.Count}");
                     }
                     catch (Exception ex)
                     {
-                        // Revertimos la eliminación en caso de error
+                        // En caso de error, el Rollback restaura los datos borrados en el paso 2
                         await transaction.RollbackAsync();
-                        Console.WriteLine($"Error crítico durante la carga (Rollback ejecutado): {ex.Message}");
+                        Console.WriteLine($"Error crítico durante la carga. Se realizó Rollback: {ex.Message}");
                     }
                 }
             }
