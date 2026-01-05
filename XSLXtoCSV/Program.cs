@@ -7,7 +7,8 @@ using XSLXtoCSV.Service.Efficiency;
 
 
 string excelAssyPath = @"\\upmap11\c$\UPM\dashboard\cumplimiento\ensamble\Copia de PIEZAS DIARIAS DICIEMBRE.xlsx";
-string excelStampPath = @"\\upmap11\c$\UPM\dashboard\cumplimiento\ensamble\Copia de PIEZAS DIARIAS DICIEMBRE.xlsx";
+string excelStampPath = @"\\upmap11\c$\UPM\dashboard\cumplimiento\estampado\Control de resultados por grupos-Diciembre 25.xlsx";
+string excelCortePath = @"\\upmap11\c$\UPM\dashboard\cumplimiento\corte\% CUMPLIMIENTO T. TACTO - TM.xlsx";
 
 string excelAssy01Path_OperationalEfficiency = @"\\upmap11\c$\UPM\dashboard\operatividad\ensamble\APROVECHAMIENTO DIARIO ENS I DIC 25.xlsx";
 string excelAssy02Path_OperationalEfficiency = @"\\upmap11\c$\UPM\dashboard\operatividad\ensamble\APROVECHAMIENTO DIARIO ENS II DIC 25.xlsx";
@@ -24,6 +25,10 @@ string _fileAssy01OEShift01OutPath = @"\\upmap11\c$\UPM\dashboard\operatividad\e
 
 string _fileAssy01OEShift03Path = @"\\upmap11\c$\UPM\dashboard\operatividad\ensamble\APROVECHAMIENTO DIARIO ENS I DIC 25.xlsx_APROVECHAMIENTO DIARIO 3ERT..csv";
 string _fileAssy01OEShift03OutPath = @"\\upmap11\c$\UPM\dashboard\operatividad\ensamble\APROVECHAMIENTO DIARIO ENS I DIC 25.xlsx_APROVECHAMIENTO DIARIO 3ERT_Normalize.csv";
+
+string _fileCortePath = @"\\upmap11\c$\UPM\dashboard\cumplimiento\corte\% CUMPLIMIENTO T. TACTO - TM.xlsx_CORTE Y ENSAMBLE.csv";
+string _fileCorteOutPath = @"\\upmap11\c$\UPM\dashboard\cumplimiento\corte\% CUMPLIMIENTO T. TACTO - TM.xlsx_CORTE Y ENSAMBLE_Normalize.csv";
+
 
 /******************************************************************************/
 
@@ -56,6 +61,9 @@ try
     ConvertSheetsToCSV.ProcessExcelFixed(excelStampPath);
     Console.WriteLine("\n¡Proceso Estampado finalizado correctamente!");
 
+    ConvertSheetsToCSV.ProcessExcelFixed(excelCortePath);
+    Console.WriteLine("\n¡Proceso Corte finalizado correctamente!");
+
     /******************************************************************************/
 
     ConvertSheetsToCSV.ProcessExcelFixed(excelAssy01Path_OperationalEfficiency);
@@ -67,7 +75,7 @@ try
     ConvertSheetsToCSV.ProcessExcelFixed(excelStampPath_OperationalEfficiency);
     Console.WriteLine("\n¡Proceso Estampado Operatividad finalizado correctamente!");
 
-    /******************************************************************************/
+    ///******************************************************************************/
 
     Assy01_LoadDataService.Normalize(_fileAssy01Path, _fileAssy01OutPath);
     Console.WriteLine("\nNormalizar Ensamble 01 ¡Proceso finalizado correctamente!");
@@ -78,6 +86,9 @@ try
 
     Assy01_OperationalEfficiency_LoadData.NormalizeEfficiency(_fileAssy01OEShift03Path, _fileAssy01OEShift03OutPath, "ENSAMBLE I", "3");
     Console.WriteLine("\nNormalizar Ensamble 01 turno 3 Operatividad ¡Proceso finalizado correctamente!");
+
+    Corte_LoadDataService.Normalize(_fileCortePath, _fileCorteOutPath);
+    Console.WriteLine("\nNormalizar Corte ¡Proceso finalizado correctamente!");
 
     /******************************************************************************/
 
