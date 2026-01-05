@@ -164,10 +164,10 @@ namespace XSLXtoCSV.Service.Efficiency
                     {
                         normalizedData.Add(new OperationalEfficiency
                         {
-                            Id = Guid.Parse(columns[0]),
+                            Id = Guid.NewGuid(), // Siempre nuevos IDs para recarga limpia
                             Active = bool.Parse(columns[1]),
-                            CreateDate = DateTime.Parse(columns[2], CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal),
-                            CreateBy = columns[3],
+                            CreateDate = DateTime.UtcNow,
+                            CreateBy = "System_Reload_EF9",
                             ProductionDate = DateTime.Parse(columns[4], CultureInfo.InvariantCulture, DateTimeStyles.None),
                             Area = columns[5],
                             Supervisor = columns[6],
@@ -206,75 +206,44 @@ namespace XSLXtoCSV.Service.Efficiency
 
             if (normalizedData.Any())
             {
-                try
+                using (var context = new UPMContext())
                 {
-                    using (var context = new UPMContext())
+                    // Usamos una transacción para garantizar que no borremos datos si la inserción falla
+                    using var transaction = await context.Database.BeginTransactionAsync();
+
+                    try
                     {
-                        // Definimos la clave única: Parte + Fecha + Turno
-                        var partNumbers = normalizedData.Select(d => d.PartNumberName).Distinct().ToList();
-                        var minDate = normalizedData.Min(d => d.ProductionDate).Date;
-                        var maxDate = normalizedData.Max(d => d.ProductionDate).Date;
+                        // 1. Identificamos qué Áreas y Periodos (Mes/Año) vienen en el CSV
+                        var targets = normalizedData
+                            .GroupBy(x => new { x.Area, x.ProductionDate.Year, x.ProductionDate.Month })
+                            .Select(g => g.Key);
 
-                        var existingRecords = await context.OperationalEfficiencies
-                            .Where(p => partNumbers.Contains(p.PartNumberName) && p.ProductionDate >= minDate && p.ProductionDate <= maxDate)
-                            .ToDictionaryAsync(p => $"{p.PartNumberName}|{p.ProductionDate:yyyy-MM-dd}|{p.Shift}");
-
-                        int newRecords = 0;
-                        int updatedRecords = 0;
-
-                        foreach (var item in normalizedData)
+                        foreach (var target in targets)
                         {
-                            var key = $"{item.PartNumberName}|{item.ProductionDate:yyyy-MM-dd}|{item.Shift}";
+                            // 2. EF9: Eliminación directa y ultra rápida en la DB
+                            await context.OperationalEfficiencies
+                                .Where(p => p.Area == target.Area
+                                         && p.ProductionDate.Year == target.Year
+                                         && p.ProductionDate.Month == target.Month)
+                                .ExecuteDeleteAsync();
 
-                            if (existingRecords.TryGetValue(key, out var existing))
-                            {
-                                // Verificar si hubo cambios en los KPIs principales
-                                bool changed = existing.RealTime != item.RealTime ||
-                                               existing.PriductionReal != item.PriductionReal ||
-                                               existing.TotalDowntime != item.TotalDowntime ||
-                                               existing.Supervisor != item.Supervisor;
-
-                                if (changed)
-                                {
-                                    // Actualizar campos
-                                    existing.Supervisor = item.Supervisor;
-                                    existing.Leader = item.Leader;
-                                    existing.Hp = item.Hp;
-                                    existing.Neck = item.Neck;
-                                    existing.RealTime = item.RealTime;
-                                    existing.OperativityPercent = item.OperativityPercent;
-                                    existing.PriductionReal = item.PriductionReal;
-                                    existing.TotalTime = item.TotalTime;
-                                    existing.ProgramabeDowntimeTime = item.ProgramabeDowntimeTime;
-                                    existing.RealWorkingTime = item.RealWorkingTime;
-                                    existing.NetoWorkingTime = item.NetoWorkingTime;
-                                    existing.NetoProduictiveTime = item.NetoProduictiveTime;
-                                    existing.TotalDowntime = item.TotalDowntime;
-                                    existing.NoProgramabeDowntimeTime = item.NoProgramabeDowntimeTime;
-                                    existing.NoReportedTime = item.NoReportedTime;
-                                    existing.DowntimePercent = item.DowntimePercent;
-                                    existing.NoProgramableDowntimePercent = item.NoProgramableDowntimePercent;
-                                    existing.ProgramableDowntimePercent = item.ProgramableDowntimePercent;
-
-                                    existing.CreateDate = DateTime.UtcNow;
-                                    existing.CreateBy = "System_Upsert_Efficiency";
-                                    updatedRecords++;
-                                }
-                            }
-                            else
-                            {
-                                context.OperationalEfficiencies.Add(item);
-                                newRecords++;
-                            }
+                            Console.WriteLine($"Limpieza exitosa: {target.Area} ({target.Month}/{target.Year})");
                         }
 
+                        // 3. Inserción de los nuevos datos normalizados
+                        await context.OperationalEfficiencies.AddRangeAsync(normalizedData);
                         await context.SaveChangesAsync();
-                        Console.WriteLine($"Carga finalizada. Nuevos: {newRecords}, Actualizados: {updatedRecords}.");
+
+                        // 4. Confirmar transacción
+                        await transaction.CommitAsync();
+                        Console.WriteLine($"Carga finalizada exitosamente. Total insertados: {normalizedData.Count}");
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error de base de datos: {ex.Message}");
+                    catch (Exception ex)
+                    {
+                        // Revertimos la eliminación en caso de error
+                        await transaction.RollbackAsync();
+                        Console.WriteLine($"Error crítico durante la carga (Rollback ejecutado): {ex.Message}");
+                    }
                 }
             }
         }

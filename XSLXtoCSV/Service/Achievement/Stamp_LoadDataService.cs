@@ -146,7 +146,7 @@ namespace XSLXtoCSV.Service.Achievement
 
                 if (lines.Length <= 1)
                 {
-                    Console.WriteLine("CSV file is empty or contains only headers. No data to load.");
+                    Console.WriteLine("CSV file is empty or contains only headers.");
                     return;
                 }
 
@@ -156,14 +156,16 @@ namespace XSLXtoCSV.Service.Achievement
 
                     var columns = csvSplitRegex.Split(line).Select(s => s.Trim(' ', '"')).ToArray();
 
+                    if (float.Parse(columns[11], CultureInfo.InvariantCulture) == 0) continue;
+
                     try
                     {
                         normalizedData.Add(new ProductionAchievement
                         {
-                            Id = Guid.Parse(columns[0]),
+                            Id = Guid.NewGuid(), // Generamos nuevos IDs para la inserción limpia
                             Active = bool.Parse(columns[1]),
-                            CreateDate = DateTime.Parse(columns[2], CultureInfo.InvariantCulture, DateTimeStyles.AdjustToUniversal),
-                            CreateBy = columns[3],
+                            CreateDate = DateTime.UtcNow,
+                            CreateBy = "System_Reload_EF9",
                             ProductionDate = DateTime.Parse(columns[4], CultureInfo.InvariantCulture, DateTimeStyles.None),
                             Supervisor = columns[5],
                             Leader = columns[6],
@@ -175,97 +177,63 @@ namespace XSLXtoCSV.Service.Achievement
                             Area = columns[12]
                         });
                     }
-                    catch (FormatException fe)
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"Error parsing line: {line}. Details: {fe.Message}");
-                    }
-                    catch (IndexOutOfRangeException iore)
-                    {
-                        Console.WriteLine($"Error: Malformed line (too few columns): {line}. Details: {iore.Message}");
+                        Console.WriteLine($"Error parsing line: {ex.Message}");
                     }
                 }
             }
-            catch (IOException ioEx)
-            {
-                Console.WriteLine($"Error reading CSV file {csvFilePath}: {ioEx.Message}");
-                return;
-            }
             catch (Exception ex)
             {
-                Console.WriteLine($"An unexpected error occurred while processing CSV: {ex.Message}");
+                Console.WriteLine($"An error occurred while processing CSV: {ex.Message}");
                 return;
             }
 
             if (normalizedData.Any())
             {
-                try
+                using (var context = new UPMContext())
                 {
-                    using (var context = new UPMContext())
+                    // Iniciamos una transacción para asegurar la integridad de los datos
+                    using var transaction = await context.Database.BeginTransactionAsync();
+
+                    try
                     {
-                        var partNumbers = normalizedData.Select(d => d.PartNumberName).Distinct().ToList();
-                        var minDate = normalizedData.Min(d => d.ProductionDate).Date;
-                        var maxDate = normalizedData.Max(d => d.ProductionDate).Date;
+                        // 1. Identificar combinaciones de Área y Periodo (Mes/Año) en el CSV
+                        var targets = normalizedData
+                            .GroupBy(d => new { d.Area, d.ProductionDate.Year, d.ProductionDate.Month })
+                            .Select(g => g.Key);
 
-                        var existingRecords = await context.ProductionAchievements
-                            .Where(p => partNumbers.Contains(p.PartNumberName) && p.ProductionDate >= minDate && p.ProductionDate <= maxDate)
-                            .ToDictionaryAsync(p => $"{p.PartNumberName}|{p.ProductionDate:yyyy-MM-dd}");
-
-                        int newRecordsCount = 0;
-                        int updatedRecordsCount = 0;
-
-                        foreach (var achievement in normalizedData)
+                        foreach (var target in targets)
                         {
-                            var key = $"{achievement.PartNumberName}|{achievement.ProductionDate:yyyy-MM-dd}";
+                            // 2. EF9: Ejecutar Delete directo en la DB para limpiar el periodo específico
+                            await context.ProductionAchievements
+                                .Where(p => p.Area == target.Area
+                                         && p.ProductionDate.Year == target.Year
+                                         && p.ProductionDate.Month == target.Month)
+                                .ExecuteDeleteAsync();
 
-                            if (existingRecords.TryGetValue(key, out var existingRecord))
-                            {
-                                bool hasChanged = existingRecord.WorkingTime != achievement.WorkingTime ||
-                                                  existingRecord.ProductionObjetive != achievement.ProductionObjetive ||
-                                                  existingRecord.ProductionReal != achievement.ProductionReal ||
-                                                  existingRecord.Supervisor != achievement.Supervisor ||
-                                                  existingRecord.Leader != achievement.Leader ||
-                                                  existingRecord.Shift != achievement.Shift;
-
-                                if (hasChanged)
-                                {
-                                    existingRecord.WorkingTime = achievement.WorkingTime;
-                                    existingRecord.ProductionObjetive = achievement.ProductionObjetive;
-                                    existingRecord.ProductionReal = achievement.ProductionReal;
-                                    existingRecord.Supervisor = achievement.Supervisor;
-                                    existingRecord.Leader = achievement.Leader;
-                                    existingRecord.Shift = achievement.Shift;
-                                    existingRecord.CreateDate = DateTime.UtcNow;
-                                    existingRecord.CreateBy = "System_Upsert";
-                                    updatedRecordsCount++;
-                                }
-                            }
-                            else
-                            {
-                                context.ProductionAchievements.Add(achievement);
-                                newRecordsCount++;
-                            }
+                            Console.WriteLine($"Limpieza completada: Area {target.Area} - Mes {target.Month}/{target.Year}");
                         }
 
+                        // 3. Inserción masiva de los nuevos datos
+                        await context.ProductionAchievements.AddRangeAsync(normalizedData);
                         await context.SaveChangesAsync();
-                        Console.WriteLine($"Successfully loaded data. New records: {newRecordsCount}, Updated records: {updatedRecordsCount}.");
+
+                        // 4. Confirmar cambios
+                        await transaction.CommitAsync();
+                        Console.WriteLine($"Carga completada exitosamente. Total registros: {normalizedData.Count}");
                     }
-                }
-                catch (DbUpdateException dbEx)
-                {
-                    Console.WriteLine($"Database update error: {dbEx.Message}");
-                    if (dbEx.InnerException != null)
+                    catch (Exception ex)
                     {
-                        Console.WriteLine($"Inner exception: {dbEx.InnerException.Message}");
+                        // Si algo falla, revertimos el borrado
+                        await transaction.RollbackAsync();
+                        Console.WriteLine($"Error durante la carga. Se realizó Rollback. Detalle: {ex.Message}");
                     }
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"An error occurred while saving data to the database: {ex.Message}");
                 }
             }
             else
             {
-                Console.WriteLine("No valid production achievement records found to load into the database.");
+                Console.WriteLine("No se encontraron registros válidos para cargar.");
             }
         }
     }
