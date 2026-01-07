@@ -16,87 +16,104 @@ namespace XSLXtoCSV.Service.Achievement
 
         public static void Normalize(string inputFile, string outputFile)
         {
-            var lines = File.ReadAllLines(inputFile, Encoding.UTF8);
+            // Leemos el archivo completo para procesar celdas multilínea correctamente
+            string fullText = File.ReadAllText(inputFile, Encoding.UTF8);
 
-            if (lines.Length < 5)
-            {
-                throw new InvalidDataException("El archivo de Tiempo Tacto es demasiado corto.");
-            }
-
+            // Regex para separar filas y columnas respetando comillas
+            var rowSplitRegex = new Regex(@"\r?\n(?=(?:[^""]*""[^""]*"")*[^""]*$)");
             var csvSplitRegex = new Regex(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
 
-            // Metadata: 6 columnas iniciales antes de los días
+            var lines = rowSplitRegex.Split(fullText).Where(l => !string.IsNullOrWhiteSpace(l)).ToArray();
+
+            // Variables de contexto que se actualizan en cada bloque de encabezados
+            string[] currentDates = null;
+            string[] currentSupervisors = null;
+            string[] currentLeaders = null;
+            string[] currentShifts = null;
+
             int metadataColumnCount = 6;
-
-            // --- ENCABEZADOS HORIZONTALES ---
-            // Fila 0: Fechas
-            var dateHeaders = csvSplitRegex.Split(lines[0]).Skip(metadataColumnCount).ToArray();
-            // Fila 1: Supervisores (Sergio Ramirez, etc.)
-            var supervisorRow = csvSplitRegex.Split(lines[1]).Skip(metadataColumnCount).ToArray();
-            // Fila 2: LIDERES (Gerardo Portillo, Jaime Valadez, etc.) <-- ESTA ES LA CORRECCIÓN
-            var leaderRow = csvSplitRegex.Split(lines[2]).Skip(metadataColumnCount).ToArray();
-
             var normalizedData = new List<ProductionAchievement>();
 
-            // Los datos numéricos de las líneas empiezan después de las filas de encabezado (Skip 10 para limpiar ruido)
-            for (int i = 10; i < lines.Length; i++)
+            for (int i = 0; i < lines.Length; i++)
             {
-                var row = lines[i];
-                if (string.IsNullOrWhiteSpace(row) || row.Trim().Replace(",", "").Length == 0) continue;
+                var columns = csvSplitRegex.Split(lines[i]).Select(s => s.Trim(' ', '"', '\n', '\r')).ToArray();
 
-                string[] columns = csvSplitRegex.Split(row).Select(s => s.Trim(' ', '"', '\n', '\r')).ToArray();
-
-                // Validamos que la columna de LINEA (índice 2) tenga contenido
-                if (columns.Length <= metadataColumnCount || string.IsNullOrWhiteSpace(columns[2])) continue;
-
-                var lineName = columns[2]; // NOMBRE DE LA LINEA / PARTE
-
-                // Iterar por bloques de 4 columnas por día (Target, Real, Diff, %)
-                for (int j = 0; j < dateHeaders.Length / 4; j++)
+                // 1. DETECCIÓN DE ENCABEZADOS (Reinicio de contexto)
+                // Buscamos la fila que identifica el inicio de una sección
+                if (columns.Length > 2 && columns[0] == "TIEMPO TACTO HP" && columns[1] == "ITEM" && columns[2] == "LINEA")
                 {
-                    int dataIndexInHeaders = j * 4;
-                    int dataIndexInRow = metadataColumnCount + (j * 4);
+                    // Fila actual: Fechas
+                    currentDates = columns;
 
-                    if (dataIndexInRow + 1 >= columns.Length) break;
+                    // Fila +1: Supervisores
+                    if (i + 1 < lines.Length)
+                        currentSupervisors = csvSplitRegex.Split(lines[i + 1]).Select(s => s.Trim(' ', '"', '\n', '\r')).ToArray();
 
-                    var dateStr = dateHeaders[dataIndexInHeaders];
-                    if (string.IsNullOrWhiteSpace(dateStr)) continue;
+                    // Fila +2: Líderes (Limpiamos saltos de línea internos)
+                    if (i + 2 < lines.Length)
+                        currentLeaders = csvSplitRegex.Split(lines[i + 2]).Select(s => s.Trim(' ', '"').Replace("\n", " / ")).ToArray();
 
-                    // Parseo de Target (Objetivo) y Real (Producción)
-                    float.TryParse(columns[dataIndexInRow], NumberStyles.Any, CultureInfo.InvariantCulture, out float target);
-                    float.TryParse(columns[dataIndexInRow + 1], NumberStyles.Any, CultureInfo.InvariantCulture, out float real);
-
-                    if (target > 0 || real > 0)
+                    // Fila +4: Turnos (Una fila debajo del líder, saltando la repetición del líder en la fila 3)
+                    if (i + 4 < lines.Length)
                     {
-                        try
-                        {
-                            var culture = CultureInfo.GetCultureInfo("es-MX");
-                            var cleanDateStr = dateStr.Replace("a. m.", "AM").Replace("p. m.", "PM").Trim();
+                        currentShifts = csvSplitRegex.Split(lines[i + 4]).Select(s => {
+                            var val = s.Trim(' ', '"', '\n', '\r');
+                            var match = Regex.Match(val, @"\d+"); // Extrae "1" de "1er"
+                            return match.Success ? match.Value : "1";
+                        }).ToArray();
+                    }
 
-                            if (DateTime.TryParse(cleanDateStr, culture, DateTimeStyles.None, out DateTime productionDate))
-                            {
-                                normalizedData.Add(new ProductionAchievement
-                                {
-                                    Id = Guid.NewGuid(),
-                                    Active = true,
-                                    CreateDate = DateTime.UtcNow,
-                                    CreateBy = "System_Normalize_TactTime",
-                                    ProductionDate = productionDate,
-                                    // Capturamos Supervisor y Líder desde sus respectivas filas de encabezado
-                                    Supervisor = (dataIndexInHeaders < supervisorRow.Length) ? supervisorRow[dataIndexInHeaders] : "S/S",
-                                    Leader = (dataIndexInHeaders < leaderRow.Length) ? leaderRow[dataIndexInHeaders] : "S/L",
-                                    Shift = "1",
-                                    PartNumberName = lineName,
-                                    WorkingTime = target,
-                                    ProductionObjetive = target,
-                                    ProductionReal = real,
-                                    Area = "CORTE Y ENSAMBLE"
-                                });
-                            }
-                        }
-                        catch (Exception ex)
+                    // Saltamos el bloque completo de encabezados (6 filas)
+                    i += 5;
+                    continue;
+                }
+
+                // 2. PROCESAMIENTO DE DATOS
+                // Verificamos que sea una fila de producción (Columna ITEM es numérica)
+                if (currentDates != null && columns.Length > metadataColumnCount && int.TryParse(columns[1], out _))
+                {
+                    var partName = columns[2]; // LINEA
+                    float.TryParse(columns[4], NumberStyles.Any, CultureInfo.InvariantCulture, out float targetObjective);
+
+                    // Cada día tiene 4 columnas, procesamos los dos sub-bloques (2 grupos de líderes/turnos)
+                    for (int dayIdx = 0; dayIdx < (currentDates.Length - metadataColumnCount) / 4; dayIdx++)
+                    {
+                        for (int subIdx = 0; subIdx < 2; subIdx++)
                         {
-                            Console.WriteLine($"Error en fecha {dateStr}: {ex.Message}");
+                            int colIdx = metadataColumnCount + (dayIdx * 4) + (subIdx * 2);
+                            if (colIdx + 1 >= columns.Length) break;
+
+                            float.TryParse(columns[colIdx], NumberStyles.Any, CultureInfo.InvariantCulture, out float tactTimeReal);
+                            float.TryParse(columns[colIdx + 1], NumberStyles.Any, CultureInfo.InvariantCulture, out float compliancePercent);
+
+                            // Solo guardamos si hay actividad reportada
+                            if (tactTimeReal > 0 || compliancePercent > 0)
+                            {
+                                var dateStr = currentDates[colIdx];
+                                var culture = CultureInfo.GetCultureInfo("es-MX");
+                                var cleanDate = dateStr.Replace("a. m.", "AM").Replace("p. m.", "PM").Trim();
+
+                                if (DateTime.TryParse(cleanDate, culture, DateTimeStyles.None, out DateTime prodDate))
+                                {
+                                    normalizedData.Add(new ProductionAchievement
+                                    {
+                                        Id = Guid.NewGuid(),
+                                        Active = true,
+                                        CreateDate = DateTime.UtcNow,
+                                        CreateBy = "System_Normalize_TactTime_V2",
+                                        ProductionDate = prodDate,
+                                        // Asignamos valores desde el contexto actual
+                                        Supervisor = (colIdx < currentSupervisors?.Length) ? currentSupervisors[colIdx] : "S/S",
+                                        Leader = (colIdx < currentLeaders?.Length) ? currentLeaders[colIdx] : "S/L",
+                                        Shift = (colIdx < currentShifts?.Length) ? currentShifts[colIdx] : "1",
+                                        PartNumberName = partName,
+                                        WorkingTime = tactTimeReal,
+                                        ProductionObjetive = targetObjective,
+                                        ProductionReal = compliancePercent,
+                                        Area = "CORTE PCP"
+                                    });
+                                }
+                            }
                         }
                     }
                 }

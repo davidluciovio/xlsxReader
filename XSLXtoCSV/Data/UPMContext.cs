@@ -37,7 +37,12 @@ public partial class UPMContext : DbContext
             entity.Property(e => e.Leader).HasMaxLength(100);
             entity.Property(e => e.PartNumberName).HasMaxLength(200);
             entity.Property(e => e.Shift).HasMaxLength(50);
+            entity.Property(e => e.SpmReal).HasColumnName("SPM_Real");
+            entity.Property(e => e.SpmSet).HasColumnName("SPM_Set");
+            entity.Property(e => e.StSpmSet).HasColumnName("ST_SPM_Set");
             entity.Property(e => e.Supervisor).HasMaxLength(100);
+            entity.Property(e => e.Tt).HasColumnName("TT");
+            entity.Property(e => e.Ttt).HasColumnName("TTT");
         });
 
         modelBuilder.Entity<ProductionAchievement>(entity =>

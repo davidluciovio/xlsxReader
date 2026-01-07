@@ -58,4 +58,22 @@ public partial class OperationalEfficiency
     public float NoProgramableDowntimePercent { get; set; }
 
     public float ProgramableDowntimePercent { get; set; }
+
+    public float Aprov { get; set; }
+
+    public float Junta { get; set; }
+
+    public float Pilotaje { get; set; }
+
+    public float SpmReal { get; set; }
+
+    public float SpmSet { get; set; }
+
+    public float StSpmSet { get; set; }
+
+    public float Stroke { get; set; }
+
+    public float Tt { get; set; }
+
+    public float Ttt { get; set; }
 }

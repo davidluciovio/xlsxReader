@@ -11,16 +11,15 @@ using XSLXtoCSV.Data.UPM_System;
 
 namespace XSLXtoCSV.Service.Efficiency
 {
-    public class Stamp_OperationalEfficiency_LoadData
+    public class PCPStamp_OperationalEfficiency_LoadData
     {
-        public static void NormalizeEstampado(string inputFile, string outputFile)
+        public static void NormalizeEstampado(string inputFile, string outputFile, string press = "")
         {
             var lines = File.ReadAllLines(inputFile, Encoding.UTF8);
             var csvSplitRegex = new Regex(",(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
 
             var normalizedData = new List<OperationalEfficiency>();
 
-            // Variables de contexto para encabezados dinámicos
             string[] currentSupervisors = null;
             string[] currentLeaders = null;
             string[] currentDates = null;
@@ -32,7 +31,7 @@ namespace XSLXtoCSV.Service.Efficiency
 
                 string metricLabel = columns[3]; // Columna de métrica (STROKE, T.T., etc.)
 
-                // 1. Detección de Encabezados (Contexto)
+                // 1. Detección de Encabezados (Contexto Dinámico)
                 if (metricLabel.Equals("SUPERVISOR", StringComparison.OrdinalIgnoreCase))
                 {
                     currentSupervisors = columns;
@@ -43,8 +42,8 @@ namespace XSLXtoCSV.Service.Efficiency
                     currentLeaders = columns;
                     continue;
                 }
-                // Fila de fechas: No tiene etiqueta en Col 3, pero tiene fechas en Col 4
-                if (string.IsNullOrEmpty(metricLabel) && columns.Length > 4 && columns[4].Contains("/12/2025"))
+                // Fila de fechas (basado en el número de día 1, 2, 3...)
+                if (string.IsNullOrEmpty(metricLabel) && columns.Length > 4 && int.TryParse(columns[4], out int day1) && day1 == 1)
                 {
                     currentDates = columns;
                     continue;
@@ -64,66 +63,60 @@ namespace XSLXtoCSV.Service.Efficiency
                     if (string.IsNullOrWhiteSpace(partNumber)) continue;
                     string shift = Regex.Match(shiftRaw, @"\d+").Value;
 
-                    // Iterar por cada día (Columnas 4 a 34)
-                    for (int colIdx = 4; colIdx < (currentDates?.Length ?? 0); colIdx++)
+                    for (int colIdx = 4; colIdx <= 34; colIdx++) // Días 1 al 31
                     {
-                        var dateStr = currentDates[colIdx];
-                        if (string.IsNullOrWhiteSpace(dateStr) || dateStr.Contains("APROV")) continue;
+                        if (colIdx >= (currentDates?.Length ?? 0)) break;
 
-                        // Helper para parsear números del bloque
+                        // Helper para parsear números
                         float GetVal(int rowIdx) => (colIdx < block[rowIdx].Length && float.TryParse(block[rowIdx][colIdx], NumberStyles.Any, CultureInfo.InvariantCulture, out float v)) ? v : 0;
 
-                        // Validamos si hay datos reales o metas en este día
-                        if (GetVal(5) > 0 || GetVal(6) > 0)
+                        float spmReal = GetVal(5);
+                        float spmSet = GetVal(6);
+
+                        if (partNumber == "1ER TURNO") continue;
+
+                        if (spmReal > 0 || spmSet > 0)
                         {
-                            try
+                            int day = int.Parse(currentDates[colIdx]);
+                            var prodDate = new DateTime(2025, 12, day);
+
+                            normalizedData.Add(new OperationalEfficiency
                             {
-                                var culture = CultureInfo.GetCultureInfo("es-MX");
-                                var cleanDate = dateStr.Replace("a. m.", "AM").Replace("p. m.", "PM").Trim();
+                                Id = Guid.NewGuid(),
+                                Active = true,
+                                CreateDate = DateTime.UtcNow,
+                                CreateBy = "System_Normalize_Estampado",
+                                ProductionDate = prodDate,
+                                Area = "PCP ESTAMPADO",
+                                Supervisor = (currentSupervisors != null && colIdx < currentSupervisors.Length) ? currentSupervisors[colIdx] : "",
+                                Leader = (currentLeaders != null && colIdx < currentLeaders.Length) ? currentLeaders[colIdx] : "",
+                                Shift = shift,
+                                PartNumberName = $"{partNumber} - {prensa}",
 
-                                if (DateTime.TryParse(cleanDate, culture, DateTimeStyles.None, out DateTime prodDate))
-                                {
-                                    normalizedData.Add(new OperationalEfficiency
-                                    {
-                                        Id = Guid.NewGuid(),
-                                        Active = true,
-                                        CreateDate = DateTime.UtcNow,
-                                        CreateBy = "System_Normalize_Estampado_DATOS",
-                                        ProductionDate = prodDate,
-                                        Area = $"ESTAMPADO",
-                                        Supervisor = (currentSupervisors != null && colIdx < currentSupervisors.Length) ? currentSupervisors[colIdx] : "",
-                                        Leader = (currentLeaders != null && colIdx < currentLeaders.Length) ? currentLeaders[colIdx] : "",
-                                        Shift = shift,
-                                        PartNumberName = $"{partNumber} - {prensa}" ,
+                                // Mapeo solicitado
+                                Stroke = GetVal(0),
+                                Tt = GetVal(1),
+                                Junta = GetVal(2),
+                                Pilotaje = GetVal(3),
+                                Ttt = GetVal(4),
+                                SpmReal = spmReal,
+                                SpmSet = spmSet,
+                                StSpmSet = GetVal(7),
+                                Aprov = GetVal(8),
 
-                                        // Mapeo a propiedades extendidas
-                                        Stroke = GetVal(0),
-                                        Tt = GetVal(1),
-                                        Junta = GetVal(2),
-                                        Pilotaje = GetVal(3),
-                                        Ttt = GetVal(4),
-                                        SpmReal = GetVal(5),
-                                        SpmSet = GetVal(6),
-                                        StSpmSet = GetVal(7),
-                                        Aprov = GetVal(8),
-
-                                        // Mapeo a propiedades base (compatibilidad)
-                                        Hp = GetVal(6),                 // SPM SET
-                                        PriductionReal = GetVal(5),     // SPM REAL
-                                        TotalTime = GetVal(1),          // T.T.
-                                        RealWorkingTime = GetVal(4),    // T.T.T.
-                                        TotalDowntime = GetVal(2) + GetVal(3), // JUNTA + PILOTAJE
-                                        OperativityPercent = GetVal(8)  // % APROV.
-                                    });
-                                }
-                            }
-                            catch { continue; }
+                                // Mapeo de compatibilidad
+                                Hp = spmSet,
+                                PriductionReal = spmReal,
+                                TotalTime = GetVal(1),
+                                RealWorkingTime = GetVal(4),
+                                TotalDowntime = GetVal(2) + GetVal(3),
+                                OperativityPercent = GetVal(8)
+                            });
                         }
                     }
-                    i += 8; // Saltar el bloque procesado
+                    i += 8;
                 }
             }
-
             WriteEfficiencyToCsv(normalizedData, outputFile);
         }
 
@@ -140,8 +133,11 @@ namespace XSLXtoCSV.Service.Efficiency
 
             foreach (var r in data)
             {
-                
-                if (r.PartNumberName == "1ER TURNO" || r.PartNumberName == "3ER TURNO") continue;
+
+                if ( string.IsNullOrEmpty(Sanitize(r.Leader)))
+                {
+                    continue;
+                }
                 // 2. Formato de línea actualizado (Índices 0 al 34)
                 // Usamos InvariantCulture para asegurar que los decimales usen punto (.) y no coma (,)
                 var line = string.Format(CultureInfo.InvariantCulture,
@@ -222,7 +218,12 @@ namespace XSLXtoCSV.Service.Efficiency
                     var columns = csvSplitRegex.Split(line).Select(s => s.Trim(' ', '"')).ToArray();
 
                     if (float.Parse(columns[14], CultureInfo.InvariantCulture) == 0) continue;
-                    if (columns[8] != "3" || columns[8] != "1") continue;
+
+                    if (columns[6] == null )
+                    {
+                        continue;
+                    }
+
                     try
                     {
                         normalizedData.Add(new OperationalEfficiency
@@ -232,7 +233,7 @@ namespace XSLXtoCSV.Service.Efficiency
                             CreateDate = DateTime.UtcNow,
                             CreateBy = "System_Reload_EF9",
                             ProductionDate = DateTime.Parse(columns[4], CultureInfo.InvariantCulture, DateTimeStyles.None),
-                            Area = "ESTAMPADO",
+                            Area = "PCP ESTAMPADO",
                             Supervisor = columns[6],
                             Leader = columns[7],
                             Shift = columns[8],
@@ -253,16 +254,17 @@ namespace XSLXtoCSV.Service.Efficiency
                             DowntimePercent = float.Parse(columns[23], CultureInfo.InvariantCulture),
                             NoProgramableDowntimePercent = float.Parse(columns[24], CultureInfo.InvariantCulture),
                             ProgramableDowntimePercent = float.Parse(columns[25], CultureInfo.InvariantCulture),
-                            // Mapeo solicitado
-                            Stroke = 0,
-                            Tt = 0,
-                            Junta = 0,
-                            Pilotaje = 0,
-                            Ttt = 0,
-                            SpmReal = 0,
-                            SpmSet = 0,
-                            StSpmSet = 0,
-                            Aprov = 0
+                            // Campos específicos de Estampado (respecto al header del CSV)
+                            Stroke = float.Parse(columns[26], CultureInfo.InvariantCulture),
+                            Tt = float.Parse(columns[27], CultureInfo.InvariantCulture),
+                            Junta = float.Parse(columns[28], CultureInfo.InvariantCulture),
+                            Pilotaje = float.Parse(columns[29], CultureInfo.InvariantCulture),
+                            Ttt = float.Parse(columns[30], CultureInfo.InvariantCulture),
+                            SpmReal = float.Parse(columns[31], CultureInfo.InvariantCulture),
+                            SpmSet = float.Parse(columns[32], CultureInfo.InvariantCulture),
+                            StSpmSet = float.Parse(columns[33], CultureInfo.InvariantCulture),
+                            Aprov = float.Parse(columns[34], CultureInfo.InvariantCulture)
+
                         });
                     }
                     catch (Exception ex)
