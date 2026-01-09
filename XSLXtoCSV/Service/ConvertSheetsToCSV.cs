@@ -14,7 +14,7 @@ namespace XSLXtoCSV.Service
         {
             
         }
-        public static void ProcessExcelFixed(string excelFilePath)
+        public static void ProcessExcelFixed(string excelFilePath, ref List<string> filePaths)
         {
             using (var stream = File.Open(excelFilePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
             {
@@ -77,6 +77,9 @@ namespace XSLXtoCSV.Service
                         // 3. Guardar en CSV
                         string safeName = string.Join("_", sheetName.Split(Path.GetInvalidFileNameChars()));
                         string outputPath = $"{Path.GetFullPath(excelFilePath)}_{safeName}.csv";
+
+                        filePaths.Add(outputPath);
+
                         SaveToCsv(table, outputPath);
 
                         // NextResult() ahora funcionará correctamente porque el cursor está al final de la hoja actual

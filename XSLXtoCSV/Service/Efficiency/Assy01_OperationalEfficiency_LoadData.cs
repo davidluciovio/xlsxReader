@@ -15,6 +15,8 @@ namespace XSLXtoCSV.Service.Efficiency
     {
         public static void NormalizeEfficiency(string inputFile, string outputFile, string area = "ENSAMBLE I", string shift = "1")
         {
+            if (inputFile.Contains("MASTES.csv")) return;
+
             var lines = File.ReadAllLines(inputFile, Encoding.UTF8);
 
             if (lines.Length < 4)
@@ -67,7 +69,7 @@ namespace XSLXtoCSV.Service.Efficiency
                     {
                         var culture = CultureInfo.GetCultureInfo("es-MX");
                         var cleanDateStr = dateStr.Replace("a. m.", "AM").Replace("p. m.", "PM").Trim();
-
+ 
                         if (DateTime.TryParse(cleanDateStr, culture, DateTimeStyles.None, out DateTime prodDate))
                         {
                             normalizedData.Add(new OperationalEfficiency

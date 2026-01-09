@@ -221,7 +221,7 @@ namespace XSLXtoCSV.Service
                                          && p.ProductionDate.Month == target.Month)
                                 .ExecuteDeleteAsync();
 
-                            Console.WriteLine($"Limpieza exitosa: {target.Area} ({target.Month}/{target.Year})");
+                            Console.WriteLine($"Limpieza exitosa: {target.Area} ({target.Month}/{target.Year}) {target.PartNumberName}");
                         }
 
                         // 3. Inserción de los nuevos datos normalizados

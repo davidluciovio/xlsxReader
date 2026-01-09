@@ -96,7 +96,7 @@ namespace XSLXtoCSV.Service.Efficiency
                                         Area = "PCP CORTE",
                                         Supervisor = (colIdx < currentSupervisors?.Length) ? currentSupervisors[colIdx] : "S/S",
                                         Leader = (colIdx < currentLeaders?.Length) ? currentLeaders[colIdx] : "S/L",
-                                        Shift = (colIdx < currentShifts?.Length) ? currentShifts[colIdx] : (subIdx == 0 ? "1" : "3"),
+                                        Shift = (colIdx < currentShifts?.Length) ? (currentShifts[colIdx] == "A" ? "1" : "3" ) : (subIdx == 0 ? "1" : "3"),
                                         PartNumberName = partName,
 
                                         // Mapeo de KPIs

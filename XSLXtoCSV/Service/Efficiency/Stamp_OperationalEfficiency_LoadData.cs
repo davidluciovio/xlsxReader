@@ -43,8 +43,13 @@ namespace XSLXtoCSV.Service.Efficiency
                     currentLeaders = columns;
                     continue;
                 }
-                // Fila de fechas: No tiene etiqueta en Col 3, pero tiene fechas en Col 4
-                if (string.IsNullOrEmpty(metricLabel) && columns.Length > 4 && columns[4].Contains("/12/2025"))
+                // Fila de fechas: 
+                // 1. La etiqueta (Col 3) es vacía O es "0".
+                // 2. La Col 4 tiene algo que parece una fecha (contiene "/" y números).
+                if ((string.IsNullOrEmpty(metricLabel) || metricLabel.Trim() == "0")
+                    && columns.Length > 4
+                    && columns[4].Contains("/")
+                    && columns[4].Any(char.IsDigit))
                 {
                     currentDates = columns;
                     continue;
