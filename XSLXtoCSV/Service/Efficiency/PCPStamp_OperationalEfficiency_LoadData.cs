@@ -78,7 +78,7 @@ namespace XSLXtoCSV.Service.Efficiency
                         if (spmReal > 0 || spmSet > 0)
                         {
                             int day = int.Parse(currentDates[colIdx]);
-                            var prodDate = new DateTime(2026, 1, day);
+                            var prodDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, day);
 
                             normalizedData.Add(new OperationalEfficiency
                             {
@@ -86,7 +86,7 @@ namespace XSLXtoCSV.Service.Efficiency
                                 Active = true,
                                 CreateDate = DateTime.UtcNow,
                                 CreateBy = "System_Normalize_Estampado",
-                                ProductionDate = prodDate,
+                                ProductionDate = prodDate.Month != DateTime.Now.Month ? shift == "1" ? new DateTime(prodDate.Year, prodDate.Day, prodDate.Month, 8, 0, 0) : new DateTime(prodDate.Year, prodDate.Day, prodDate.Month, 21, 30, 0) : shift == "1" ? prodDate.AddHours(8) : prodDate.AddHours(21.5),
                                 Area = "PCP ESTAMPADO",
                                 Supervisor = (currentSupervisors != null && colIdx < currentSupervisors.Length) ? currentSupervisors[colIdx] : "",
                                 Leader = (currentLeaders != null && colIdx < currentLeaders.Length) ? currentLeaders[colIdx] : "",

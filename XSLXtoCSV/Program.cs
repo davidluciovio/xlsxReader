@@ -1,77 +1,135 @@
 ﻿using System.Text;
 using XSLXtoCSV.Service;
-using XSLXtoCSV.Service.Achievement;
 using XSLXtoCSV.Service.Efficiency;
 
 
 
-string excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2025\02 ENSAMBLE I\CUMPLIMIENTO PIEZAS\2025\2026 APROVECHAMIENTO\1.-APROVECHAMIENTO DIARIO ENS II ENE 26.xlsx";
+string excelPath = @"";
+string destinationPath = $@"";
 string month = DateTime.Now.Month.ToString();
 string year = DateTime.Now.Year.ToString();
-string destinationPath = @"\\upmap11\c$\UPM\dashboard\operatividad\ensamble1\" + $"{month}_{year}\\";
 
 string copiedFile = "";
 
 Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
+//int area = 5;
 
-try
+for (int area = 1; area <= 5; area++)
 {
-    if (!File.Exists(excelPath))
+
+    switch (area)
     {
-        Console.WriteLine($"Error: CSV file not found at {excelPath}");
-        return;
+        case 1:
+            // Ensamble 1
+            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2025\02 ENSAMBLE I\CUMPLIMIENTO PIEZAS\2025\2026 APROVECHAMIENTO\1.-APROVECHAMIENTO DIARIO ENS I ENE 26.xlsx";
+            destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\ensamble1\{year}{month:00}\";
+            break;
+        case 5:
+            // Ensamble 2
+            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2025\02 ENSAMBLE I\CUMPLIMIENTO PIEZAS\2025\2026 APROVECHAMIENTO\1.-APROVECHAMIENTO DIARIO ENS II ENE 26.xlsx";
+            destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\ensamble2\{year}{month:00}\";
+            break;
+        case 2:
+            // Estampado
+            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2026\19 UPS\% DE APROVECHAMIENTO ESTAMPADO\01. % APROVECHAMIENTO ESTAMPADO - ENE'26 DATOS.xlsx";
+            destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\estampado\{year}{month:00}\";
+            break;
+        case 3:
+            // PCP Estampado
+            excelPath = @"\\192.168.4.200\share\01.Produccion Prensas\2026\Captura\% APROVECHAMIENTO\1.- % APROVECHAMIENTO ESTAMPADO - ENERO.xlsx";
+            destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\pcp estampado\{year}{month:00}\";
+            break;
+        case 4:
+            // PCP Corte
+            excelPath = @"\\upms002\SHARE\01.Producción\05 NUEVO SISTEMA CAPTURA Q,D\CAPTURA PRODUCCION\2026\CAPTURA DE PRODUCCION ENERO.xlsm";
+            destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\pcp corte\{year}{month:00}\";
+            break;
+        default:
+            break;
     }
 
-    if (!Directory.Exists(destinationPath))
+
+    try
     {
-        Directory.CreateDirectory(destinationPath);
-        Console.WriteLine($"Directorio creado en: {destinationPath}");
+        if (!File.Exists(excelPath))
+        {
+            Console.WriteLine($"Error: CSV file not found at {excelPath}");
+            return;
+        }
+
+        if (!Directory.Exists(destinationPath))
+        {
+            Directory.CreateDirectory(destinationPath);
+            Console.WriteLine($"Directorio creado en: {destinationPath}");
+        }
+
+        var fileName = Path.GetFileName(excelPath);
+        var destinationFile = Path.Combine(destinationPath, fileName);
+
+        File.Copy(excelPath, destinationFile, true);
+
+        copiedFile = destinationFile;
+
+        Console.WriteLine($"Archivo {excelPath} copiado y reemplazado (si existía).");
+
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"ERROR AL COPIAR EL ARCHIVO: '{excelPath}', ERROR: '{ex.Message}'");
     }
 
-    var fileName = Path.GetFileName(excelPath);
-    var destinationFile = Path.Combine(destinationPath, fileName);
-
-    File.Copy(excelPath, destinationFile, true);
-
-    copiedFile = destinationFile;
-
-    Console.WriteLine($"Archivo {excelPath} copiado y reemplazado (si existía).");
-
-}
-catch (Exception ex)
-{
-    Console.WriteLine($"ERROR AL COPIAR EL ARCHIVO: '{excelPath}', ERROR: '{ex.Message}'");
-}
 
 
-
-try
-{
-    var csvFiles = new List<string>();
-    var csvNormalizeFiles = new List<string>();
-
-    ConvertSheetsToCSV.ProcessExcelFixed(copiedFile, ref csvFiles);
-    Console.WriteLine("\n¡Proceso Ensamble finalizado correctamente!");
-
-    csvFiles.ForEach(async file =>
+    try
     {
-        Assy02_OperationalEfficiency_LoadData.NormalizeEfficiencyEnsII(file, file.Replace(".csv", "_Normalize.csv"));
-        Console.WriteLine($"\nNormalizar Estampado ¡Proceso finalizado correctamente para el archivo: {file}!");
+        var csvFiles = new List<string>();
+        var csvNormalizeFiles = new List<string>();
 
-        csvNormalizeFiles.Add(file.Replace(".csv", "_Normalize.csv"));
-    });
+        ConvertSheetsToCSV.ProcessExcelFixed(copiedFile, ref csvFiles);
+        Console.WriteLine("\n¡Proceso Ensamble finalizado correctamente!");
 
-    foreach (var file in csvNormalizeFiles)
+        csvFiles.ForEach(async file =>
+        {
+            switch (area)
+            {
+                case 1:
+                    Assy01_OperationalEfficiency_LoadData.NormalizeEfficiency(file, file.Replace(".csv", "_Normalize.csv"));
+                    Console.WriteLine($"\nNormalizar Ensamble ¡Proceso finalizado correctamente para el archivo: {file}!");
+                    break;
+                case 5:
+                    Assy02_OperationalEfficiency_LoadData.NormalizeEfficiencyEnsII(file, file.Replace(".csv", "_Normalize.csv"));
+                    Console.WriteLine($"\nNormalizar Ensamble ¡Proceso finalizado correctamente para el archivo: {file}!");
+                    break;
+                case 2:
+                    Stamp_OperationalEfficiency_LoadData.NormalizeEstampado(file, file.Replace(".csv", "_Normalize.csv"));
+                    Console.WriteLine($"\nNormalizar Estampado ¡Proceso finalizado correctamente para el archivo: {file}!");
+                    break;
+                case 3:
+                    PCPStamp_OperationalEfficiency_LoadData.NormalizeEstampado(file, file.Replace(".csv", "_Normalize.csv"));
+                    Console.WriteLine($"\nNormalizar PCP Estampado ¡Proceso finalizado correctamente para el archivo: {file}!");
+                    break;
+                case 4:
+                    PCPCorte_OperationalEfficiency_LoadData.NormalizeCorte(file, file.Replace(".csv", "_Normalize.csv"));
+                    Console.WriteLine($"\nNormalizar PCP Corte ¡Proceso finalizado correctamente para el archivo: {file}!");
+                    break;
+            }
+
+            csvNormalizeFiles.Add(file.Replace(".csv", "_Normalize.csv"));
+        });
+
+        foreach (var file in csvNormalizeFiles)
+        {
+            await LoadToDatabase.LoadOperativityToDatabase(file);
+            Console.WriteLine($"\nCargar datos de Operatividad desde {file} ¡Proceso finalizado correctamente!");
+        }
+    }
+    catch (Exception ex)
     {
-        await LoadToDatabase.LoadOperativityToDatabase(file);
-        Console.WriteLine($"\nCargar datos de Operatividad desde {file} ¡Proceso finalizado correctamente!");
+        Console.WriteLine(ex.Message);
     }
 }
-catch (Exception ex)
-{
-    Console.WriteLine(ex.Message);
-}
+
 
 #region all data paths 
 

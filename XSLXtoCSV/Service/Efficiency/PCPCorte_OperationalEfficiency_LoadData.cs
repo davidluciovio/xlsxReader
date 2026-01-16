@@ -76,7 +76,7 @@ namespace XSLXtoCSV.Service.Efficiency
 
                             // T.T. REAL y % CUMP.
                             float.TryParse(columns[colIdx], NumberStyles.Any, CultureInfo.InvariantCulture, out float realVal);
-                            float.TryParse(columns[colIdx + 1], NumberStyles.Any, CultureInfo.InvariantCulture, out float compliancePercent);
+                            float.TryParse(columns[colIdx], NumberStyles.Any, CultureInfo.InvariantCulture, out float compliancePercent);
 
                             if (realVal > 0 || compliancePercent > 0)
                             {
@@ -92,7 +92,7 @@ namespace XSLXtoCSV.Service.Efficiency
                                         Active = true,
                                         CreateDate = DateTime.UtcNow,
                                         CreateBy = "System_Normalize_TactTime_Efficiency",
-                                        ProductionDate = prodDate,
+                                        ProductionDate = prodDate.Month != DateTime.Now.Month ? new DateTime(prodDate.Year, prodDate.Day, prodDate.Month) : prodDate,
                                         Area = "PCP CORTE",
                                         Supervisor = (colIdx < currentSupervisors?.Length) ? currentSupervisors[colIdx] : "S/S",
                                         Leader = (colIdx < currentLeaders?.Length) ? currentLeaders[colIdx] : "S/L",

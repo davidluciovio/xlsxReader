@@ -94,7 +94,7 @@ namespace XSLXtoCSV.Service.Efficiency
                                         Active = true,
                                         CreateDate = DateTime.UtcNow,
                                         CreateBy = "System_Normalize_Estampado_DATOS",
-                                        ProductionDate = prodDate,
+                                        ProductionDate = prodDate.Month != DateTime.Now.Month ? shift == "1" ? new DateTime(prodDate.Year, prodDate.Day, prodDate.Month, 8, 0, 0) : new DateTime(prodDate.Year, prodDate.Day, prodDate.Month, 21, 30, 0) : shift == "1" ? prodDate.AddHours(8) : prodDate.AddHours(21.5),
                                         Area = $"ESTAMPADO",
                                         Supervisor = (currentSupervisors != null && colIdx < currentSupervisors.Length) ? currentSupervisors[colIdx] : "",
                                         Leader = (currentLeaders != null && colIdx < currentLeaders.Length) ? currentLeaders[colIdx] : "",
