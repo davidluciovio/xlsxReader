@@ -15,6 +15,8 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 //int area = 5;
 
+//await LoadToDatabase.LoadOperativityToDatabase(@"\\upmap11\c$\UPM\dashboard\operatividad\202512.csv");
+
 await LoadToDatabase.DeleteMontlyData();
 
 for (int area = 1; area <= 5; area++)

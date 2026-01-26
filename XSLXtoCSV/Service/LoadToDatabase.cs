@@ -19,7 +19,7 @@ namespace XSLXtoCSV.Service
             {
                 var currentDate = DateTime.UtcNow;
                 var firstDayOfMonth = new DateTime(currentDate.Year, currentDate.Month, 1);
-                var lastDayOfPreviousMonth = firstDayOfMonth.AddDays(-1);
+                var lastDayOfPreviousMonth = firstDayOfMonth;
                 var targetMonth = lastDayOfPreviousMonth.Month;
                 var targetYear = lastDayOfPreviousMonth.Year;
                 // Borrar datos de ProductionAchievement del mes objetivo
@@ -196,7 +196,7 @@ namespace XSLXtoCSV.Service
                                 Active = bool.Parse(columns[1]),
                                 CreateDate = DateTime.UtcNow,
                                 CreateBy = "System_Reload_EF9",
-                                ProductionDate = DateTime.Parse(columns[4], CultureInfo.InvariantCulture),
+                                ProductionDate = DateTime.Parse(columns[4], CultureInfo.CurrentCulture),
                                 Area = columns[5].ToUpper(),
                                 Supervisor = columns[6].ToUpper(),
                                 Leader = columns[7].ToUpper(),
