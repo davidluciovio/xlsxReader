@@ -13,6 +13,26 @@ namespace XSLXtoCSV.Service
 {
     public class LoadToDatabase
     {
+        public static async Task DeleteMontlyData()
+        {
+            using (var context = new UPMContext())
+            {
+                var currentDate = DateTime.UtcNow;
+                var firstDayOfMonth = new DateTime(currentDate.Year, currentDate.Month, 1);
+                var lastDayOfPreviousMonth = firstDayOfMonth.AddDays(-1);
+                var targetMonth = lastDayOfPreviousMonth.Month;
+                var targetYear = lastDayOfPreviousMonth.Year;
+                // Borrar datos de ProductionAchievement del mes objetivo
+                await context.ProductionAchievements
+                    .Where(p => p.ProductionDate.Year == targetYear && p.ProductionDate.Month == targetMonth)
+                    .ExecuteDeleteAsync();
+                // Borrar datos de OperationalEfficiency del mes objetivo
+                await context.OperationalEfficiencies
+                    .Where(o => o.ProductionDate.Year == targetYear && o.ProductionDate.Month == targetMonth)
+                    .ExecuteDeleteAsync();
+                Console.WriteLine($"Datos del mes {targetMonth}/{targetYear} eliminados correctamente.");
+            }
+        }
         public static async Task LoadAchievementToDatabase(string csvFilePath)
         {
             if (!File.Exists(csvFilePath))
@@ -165,6 +185,8 @@ namespace XSLXtoCSV.Service
                             // 2. CORRECCIÓN OPERATIVIDAD:
                             if (!float.TryParse(columns[13], NumberStyles.Any, CultureInfo.InvariantCulture, out float operativity) || operativity == 0) continue;
 
+                            //3. EXISTE PARTNUMBER
+                            if(string.IsNullOrEmpty(columns[9])) continue;
                             // Filtros de texto
                             if (columns[9] == "3ER TURNO - 3ER TURNO" || columns[9] == "1ER TURNO - 1ER TURNO") continue;
 

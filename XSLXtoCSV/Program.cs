@@ -15,6 +15,8 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 //int area = 5;
 
+await LoadToDatabase.DeleteMontlyData();
+
 for (int area = 1; area <= 5; area++)
 {
 
