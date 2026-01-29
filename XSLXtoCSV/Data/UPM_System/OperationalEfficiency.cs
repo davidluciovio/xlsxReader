@@ -76,4 +76,8 @@ public partial class OperationalEfficiency
     public float Tt { get; set; }
 
     public float Ttt { get; set; }
+
+    public string Jefe { get; set; } = null!;
+
+    public string Managment { get; set; } = null!;
 }

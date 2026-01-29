@@ -93,7 +93,7 @@ namespace XSLXtoCSV.Service.Achievement
                                     WorkingTime = workingTime,
                                     ProductionObjetive = objective,
                                     ProductionReal = real,
-                                    Area = "ENSAMBLE I"
+                                    Area = "ENSAMBLE I",
                                 });
                             }
                         }

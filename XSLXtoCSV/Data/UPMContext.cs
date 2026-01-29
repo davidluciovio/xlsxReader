@@ -34,7 +34,9 @@ public partial class UPMContext : DbContext
 
             entity.Property(e => e.Id).HasDefaultValueSql("(newid())");
             entity.Property(e => e.Hp).HasColumnName("HP");
+            entity.Property(e => e.Jefe).HasDefaultValue("");
             entity.Property(e => e.Leader).HasMaxLength(100);
+            entity.Property(e => e.Managment).HasDefaultValue("");
             entity.Property(e => e.PartNumberName).HasMaxLength(200);
             entity.Property(e => e.Shift).HasMaxLength(50);
             entity.Property(e => e.SpmReal).HasColumnName("SPM_Real");
