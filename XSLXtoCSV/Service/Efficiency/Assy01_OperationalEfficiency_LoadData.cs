@@ -101,7 +101,9 @@ namespace XSLXtoCSV.Service.Efficiency
                                 NoReportedTime = GetVal(9),       // TIEMPO NO REPORTADO
                                 DowntimePercent = GetVal(10),     // % DE PARO TOTAL
                                 NoProgramableDowntimePercent = GetVal(11), // % DE PARO NO PROGRAMADO
-                                ProgramableDowntimePercent = GetVal(12)    // % DE PARO NO REPORTADO
+                                ProgramableDowntimePercent = GetVal(12),    // % DE PARO NO REPORTADO
+
+                                
                             });
                         }
                     }

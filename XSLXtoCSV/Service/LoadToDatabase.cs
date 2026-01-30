@@ -141,6 +141,9 @@ namespace XSLXtoCSV.Service
 
         public static async Task LoadOperativityToDatabase(string csvFilePath)
         {
+            string jefe = string.Empty; // Asignar valor correspondiente
+            string managment = string.Empty;
+
             if (!File.Exists(csvFilePath))
             {
                 Console.WriteLine($"Error: CSV file not found at {csvFilePath}");
@@ -186,7 +189,7 @@ namespace XSLXtoCSV.Service
                             if (!float.TryParse(columns[13], NumberStyles.Any, CultureInfo.InvariantCulture, out float operativity) || operativity == 0) continue;
 
                             //3. EXISTE PARTNUMBER
-                            if(string.IsNullOrEmpty(columns[9])) continue;
+                            if (string.IsNullOrEmpty(columns[9])) continue;
                             // Filtros de texto
                             if (columns[9] == "3ER TURNO - 3ER TURNO" || columns[9] == "1ER TURNO - 1ER TURNO") continue;
 
@@ -217,7 +220,9 @@ namespace XSLXtoCSV.Service
                                 NoReportedTime = float.Parse(columns[22], CultureInfo.InvariantCulture),
                                 DowntimePercent = float.Parse(columns[23], CultureInfo.InvariantCulture),
                                 NoProgramableDowntimePercent = float.Parse(columns[24], CultureInfo.InvariantCulture),
-                                ProgramableDowntimePercent = float.Parse(columns[25], CultureInfo.InvariantCulture)
+                                ProgramableDowntimePercent = float.Parse(columns[25], CultureInfo.InvariantCulture),
+                                Jefe = GetDataManagment(columns[6].ToUpper()).Jefe,
+                                Managment = GetDataManagment(columns[6].ToUpper()).Managment
                             });
                         }
                         catch (Exception ex)
@@ -271,6 +276,21 @@ namespace XSLXtoCSV.Service
                     }
                 }
             }
+        }
+
+        public static JefeManagment GetDataManagment(string supervisor)
+        {
+            return new JefeManagment
+            {
+                Jefe = "",
+                Managment = ""
+            };
+        }
+    
+        public class JefeManagment
+        {
+            public string Jefe { get; set; } = string.Empty;
+            public string Managment { get; set; } = string.Empty;
         }
     }
 }
