@@ -72,7 +72,7 @@ namespace XSLXtoCSV.Service.Achievement
                     {
                         try
                         {
-                            var culture = CultureInfo.GetCultureInfo("es-MX");
+                            var culture = CultureInfo.GetCultureInfo("en-US");
                             // Limpieza de formato de fecha español
                             var cleanDateStr = dateStr.Replace("a. m.", "AM").Replace("p. m.", "PM").Trim();
 

@@ -77,6 +77,7 @@ namespace XSLXtoCSV.Service.Efficiency
 
                         if (spmReal > 0 || spmSet > 0)
                         {
+                            if (currentDates[colIdx] == "% APROV. ACUM.") continue;
                             int day = int.Parse(currentDates[colIdx]);
                             var prodDate = new DateTime(DateTime.Now.Year, DateTime.Now.Month, day);
 

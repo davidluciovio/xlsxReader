@@ -26,27 +26,27 @@ for (int area = 1; area <= 5; area++)
     {
         case 1:
             // Ensamble 1
-            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2025\02 ENSAMBLE I\CUMPLIMIENTO PIEZAS\2025\2026 APROVECHAMIENTO\1.-APROVECHAMIENTO DIARIO ENS I ENE 26.xlsx";
+            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2025\02 ENSAMBLE I\CUMPLIMIENTO PIEZAS\2025\2026 APROVECHAMIENTO\3.-APROVECHAMIENTO DIARIO ENS I MAR 26.xlsx";
             destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\ensamble1\{year}{month:00}\";
             break;
-        case 5:
+        case 2:
             // Ensamble 2
-            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2025\02 ENSAMBLE I\CUMPLIMIENTO PIEZAS\2025\2026 APROVECHAMIENTO\1.-APROVECHAMIENTO DIARIO ENS II ENE 26.xlsx";
+            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2025\02 ENSAMBLE I\CUMPLIMIENTO PIEZAS\2025\2026 APROVECHAMIENTO\3.-APROVECHAMIENTO DIARIO ENS II MAR 26.xlsx";
             destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\ensamble2\{year}{month:00}\";
             break;
-        case 2:
+        case 3:
             // Estampado
-            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2026\19 UPS\% DE APROVECHAMIENTO ESTAMPADO\01. % APROVECHAMIENTO ESTAMPADO - ENE'26 DATOS.xlsx";
+            excelPath = @"\\upms001\USER-ALL\JUNTA DIARIA DE FUNCIONARIOS\2026\19 UPS\% DE APROVECHAMIENTO ESTAMPADO\03. % APROVECHAMIENTO ESTAMPADO - MZO'26 DATOS.xlsx";
             destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\estampado\{year}{month:00}\";
             break;
-        case 3:
-            // PCP Estampado
-            excelPath = @"\\192.168.4.200\share\01.Produccion Prensas\2026\Captura\% APROVECHAMIENTO\1.- % APROVECHAMIENTO ESTAMPADO - ENERO.xlsx";
-            destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\pcp estampado\{year}{month:00}\";
-            break;
         case 4:
+            // PCP Estampado
+            excelPath = @"\\upms002\share\01.Produccion Prensas\2026\Captura\% APROVECHAMIENTO\3.- % APROVECHAMIENTO ESTAMPADO - MARZO.xlsx";
+            destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\pcp estampado\{year}{month:00}\";
+            break; 
+        case 5:
             // PCP Corte
-            excelPath = @"\\upms002\SHARE\01.Producción\05 NUEVO SISTEMA CAPTURA Q,D\CAPTURA PRODUCCION\2026\CAPTURA DE PRODUCCION ENERO.xlsm";
+            excelPath = @"\\upms002\SHARE\01.Producción\05 NUEVO SISTEMA CAPTURA Q,D\CAPTURA PRODUCCION\2026\03 MARZO\CAPTURA DE PRODUCCION MAR.xlsm";
             destinationPath = $@"\\upmap11\c$\UPM\dashboard\operatividad\pcp corte\{year}{month:00}\";
             break;
         default:
@@ -101,19 +101,19 @@ for (int area = 1; area <= 5; area++)
                     Assy01_OperationalEfficiency_LoadData.NormalizeEfficiency(file, file.Replace(".csv", "_Normalize.csv"));
                     Console.WriteLine($"\nNormalizar Ensamble ¡Proceso finalizado correctamente para el archivo: {file}!");
                     break;
-                case 5:
+                case 2:
                     Assy02_OperationalEfficiency_LoadData.NormalizeEfficiencyEnsII(file, file.Replace(".csv", "_Normalize.csv"));
                     Console.WriteLine($"\nNormalizar Ensamble ¡Proceso finalizado correctamente para el archivo: {file}!");
                     break;
-                case 2:
+                case 3:
                     Stamp_OperationalEfficiency_LoadData.NormalizeEstampado(file, file.Replace(".csv", "_Normalize.csv"));
                     Console.WriteLine($"\nNormalizar Estampado ¡Proceso finalizado correctamente para el archivo: {file}!");
                     break;
-                case 3:
+                case 4:
                     PCPStamp_OperationalEfficiency_LoadData.NormalizeEstampado(file, file.Replace(".csv", "_Normalize.csv"));
                     Console.WriteLine($"\nNormalizar PCP Estampado ¡Proceso finalizado correctamente para el archivo: {file}!");
                     break;
-                case 4:
+                case 5:
                     PCPCorte_OperationalEfficiency_LoadData.NormalizeCorte(file, file.Replace(".csv", "_Normalize.csv"));
                     Console.WriteLine($"\nNormalizar PCP Corte ¡Proceso finalizado correctamente para el archivo: {file}!");
                     break;

@@ -1,11 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
-using System;
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using XSLXtoCSV.Data;
 using XSLXtoCSV.Data.UPM_System;
 
@@ -221,8 +217,8 @@ namespace XSLXtoCSV.Service
                                 DowntimePercent = float.Parse(columns[23], CultureInfo.InvariantCulture),
                                 NoProgramableDowntimePercent = float.Parse(columns[24], CultureInfo.InvariantCulture),
                                 ProgramableDowntimePercent = float.Parse(columns[25], CultureInfo.InvariantCulture),
-                                Jefe = GetDataManagment(columns[6].ToUpper()).Jefe,
-                                Managment = GetDataManagment(columns[6].ToUpper()).Managment
+                                Jefe = GetDataManagment(columns[5].ToUpper()).Jefe,
+                                Managment = GetDataManagment(columns[5].ToUpper()).Managment
                             });
                         }
                         catch (Exception ex)
@@ -278,15 +274,54 @@ namespace XSLXtoCSV.Service
             }
         }
 
-        public static JefeManagment GetDataManagment(string supervisor)
+        public static JefeManagment GetDataManagment(string area)
         {
-            return new JefeManagment
+            var jefeManagment = new JefeManagment();
+            switch (area)
             {
-                Jefe = "",
-                Managment = ""
-            };
+                case "ENSAMBLE I":
+                    jefeManagment = new JefeManagment
+                    {
+                        Jefe = "LOPEZ VELARDE RAMIREZ, VICTOR HUGO",
+                        Managment = "OVALLE ESPINOLA, JAVIER"
+                    };
+                    break;
+                case "ENSAMBLE II":
+                    jefeManagment = new JefeManagment
+                    {
+                        Jefe = "MARTINEZ LORETO, DAVID",
+                        Managment = "OVALLE ESPINOLA, JAVIER"
+                    };
+                    break;
+                case "ESTAMPADO":
+                    jefeManagment = new JefeManagment
+                    {
+                        Jefe = "ALVARADO , DANIEL ALEJANDRO",
+                        Managment = "LOERA ESPARZA, EMMANUEL DE JESUS"
+                    };
+                    break;
+                case "PCP CORTE":
+                    jefeManagment = new JefeManagment
+                    {
+                        Jefe = "SAENZ GARCIA, LUIS GABRIEL",
+                        Managment = "SAENZ GARCIA, LUIS GABRIEL"
+                    };
+                    break;
+                case "PCP ESTAMPADO":
+                    jefeManagment = new JefeManagment
+                    {
+                        Jefe = "CALZADA HERRERA, JUAN CARLOS",
+                        Managment = "GARCIA DE LUNA, VICTOR JAVIER"
+                    };
+                    break;
+
+                default:
+                    break;
+            }
+
+            return jefeManagment;
         }
-    
+
         public class JefeManagment
         {
             public string Jefe { get; set; } = string.Empty;
